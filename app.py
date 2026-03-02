@@ -1,3 +1,5 @@
+
+
 from flask import Flask, request, jsonify
 from flask_pymongo import PyMongo
 from flask_bcrypt import Bcrypt
@@ -24,25 +26,34 @@ jwt = JWTManager(app)
 
 users = mongo.db.users
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    print(f"Error occurred: {e}")  
+    return jsonify({"error": "Internal server error"}), 500
 
 # Register
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
-
-    username = data.get("username")
+    
+    email = data.get("email")
     password = data.get("password")
 
-    if not username or not password:
+    if not email or not password:
         return jsonify({"msg": "Missing fields"}), 400
+    if "@" not in email:
+        return jsonify({"msg": "invalid email"}), 400
+    if len(password)<8:
+        return jsonify({"msg": "short password"}), 400
 
-    if users.find_one({"username": username}):
+
+    if users.find_one({"email": email}):
         return jsonify({"msg": "User already exists"}), 400
 
     hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
 
     users.insert_one({
-        "username": username,
+        "email": email,
         "password": hashed_password
     })
 
@@ -54,15 +65,15 @@ def register():
 def login():
     data = request.get_json()
 
-    username = data.get("username")
+    email = data.get("email")
     password = data.get("password")
 
-    user = users.find_one({"username": username})
+    user = users.find_one({"email": email})
 
     if not user or not bcrypt.check_password_hash(user["password"], password):
         return jsonify({"msg": "Invalid credentials"}), 401
 
-    access_token = create_access_token(identity=username)
+    access_token = create_access_token(identity=email)
 
     return jsonify(access_token=access_token), 200
 
