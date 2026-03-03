@@ -6,6 +6,7 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import (
     JWTManager,
     create_access_token,
+    create_refresh_token,
     jwt_required,
     get_jwt_identity,
 )
@@ -26,9 +27,9 @@ jwt = JWTManager(app)
 
 users = mongo.db.users
 
+# Global Error Handler
 @app.errorhandler(Exception)
 def handle_exception(e):
-    print(f"Error occurred: {e}")  
     return jsonify({"error": "Internal server error"}), 500
 
 # Register
@@ -74,8 +75,11 @@ def login():
         return jsonify({"msg": "Invalid credentials"}), 401
 
     access_token = create_access_token(identity=email)
-
-    return jsonify(access_token=access_token), 200
+    refresh_token = create_refresh_token(identity=email)
+    return jsonify(
+    access_token=access_token,
+    refresh_token=refresh_token
+), 200
 
 
 # Protected Route
@@ -85,6 +89,12 @@ def protected():
     current_user = get_jwt_identity()
     return jsonify(logged_in_as=current_user), 200
 
+@app.route("/refresh", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh():
+    identity = get_jwt_identity()
+    new_access_token = create_access_token(identity=identity)
 
+    return jsonify(access_token=new_access_token), 200
 if __name__ == "__main__":
     app.run(debug=True)
